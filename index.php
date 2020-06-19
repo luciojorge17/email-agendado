@@ -1,28 +1,37 @@
 ﻿<?php
+/**
+ * @author Lucio Jorge
+ */
+
 include_once 'conexao.php';
 include_once 'envia_email.php';
 
+/** Assunto do e-mail */
 $assunto = "Relatório de títulos a receber";
+/** Consulta SQL de todos os vendedores ativos */
 $sql = "select cd_entidade, ds_entidade, ds_email from tbl_entidades where x_vendedor = 1 and x_ativo = 1";
 $consulta = odbc_exec($conexao, $sql);
 
+/** Consulta os títulos para cada vendedor cadastrado e ativo */
 while ($vendedor = odbc_fetch_array($consulta)) {
   $idVendedor = $vendedor['cd_entidade'];
   $nomeVendedor = utf8_encode(ucwords(strtolower($vendedor['ds_entidade'])));
+  /** E-mail do destinatário */
   $email = $vendedor['ds_email'];
+  /** Cabeçalho do e-mail */
   $cabecalho = "Olá $nomeVendedor,<br>Segue abaixo lista dos títulos vencidos até a data de hoje.<br><br>";
   $tabela = "";
+  /** Consulta SQL para listar os títulos */
   $sqlTitulos = "
-    select parcela.cd_lancamento, titulo.nr_documento, parcela.nr_parcela, nota.cd_vendedor, titulo.ds_cliente, nota.ds_email_cliente, nota.nr_ddd_cliente, nota.nr_telefone_cliente, parcela.dt_vencimento, DATEDIFF(DAY, parcela.dt_vencimento, GETDATE()) as dias, parcela.vl_parcela, parcela.  vl_saldo
-	  from sel_financeiro_titulos_areceber_parcelas as parcela
-	  	inner join sel_financeiro_titulos_areceber as titulo
-	  		on parcela.cd_lancamento = titulo.cd_lancamento
-	  	inner join sel_notas_faturamento as nota
-	  		on titulo.cd_nota_faturamento = nota.cd_lancamento
-	  where parcela.vl_saldo > 0 and parcela.dt_vencimento < GETDATE() and nota.cd_vendedor=$idVendedor
-	  order by parcela.dt_vencimento";
+    SELECT PARCELA.CD_LANCAMENTO, TITULO.NR_DOCUMENTO, PARCELA.NR_PARCELA, TITULO.CD_VENDEDOR, TITULO.DS_CLIENTE, ENTIDADE.DS_EMAIL, ENTIDADE.NR_DDD, ENTIDADE.NR_TELEFONE, PARCELA.DT_VENCIMENTO, DATEDIFF(DAY, PARCELA.DT_VENCIMENTO, GETDATE()) AS DIAS, PARCELA.VL_PARCELA, PARCELA.VL_SALDO
+         FROM SEL_FINANCEIRO_TITULOS_ARECEBER_PARCELAS AS PARCELA
+             INNER JOIN SEL_FINANCEIRO_TITULOS_ARECEBER AS TITULO ON PARCELA.CD_LANCAMENTO = TITULO.CD_LANCAMENTO
+              INNER JOIN SEL_ENTIDADES AS ENTIDADE ON ENTIDADE.CD_ENTIDADE = TITULO.CD_CLIENTE
+         WHERE PARCELA.VL_SALDO > 0 AND PARCELA.DT_VENCIMENTO < GETDATE() AND TITULO.CD_VENDEDOR=$idVendedor
+         ORDER BY PARCELA.DT_VENCIMENTO";
   $consultaTitulos = odbc_exec($conexao, $sqlTitulos);
   if (odbc_num_rows($consultaTitulos) > 0) {
+    /** Cabeçalho da tabela */
     $tabela .=
       '<table>
         <thead>
@@ -41,17 +50,19 @@ while ($vendedor = odbc_fetch_array($consulta)) {
         </thead>
         <tbody>';
 
+    /** Adiciona cada título à tabela */
     while ($titulo = odbc_fetch_array($consultaTitulos)) {
-      $lancamento = $titulo['cd_lancamento'];
-      $documento = $titulo['nr_documento'];
-      $parcela = $titulo['nr_parcela'];
-      $telefone = "(" . $titulo['nr_ddd_cliente'] . ") " . $titulo['nr_telefone_cliente'];
-      $emailCliente = utf8_encode(strtolower($titulo['ds_email_cliente']));
-      $nomeCliente = utf8_encode(ucwords(strtolower($titulo['ds_cliente'])));
-      $vencimento = date('d/m/Y', strtotime($titulo['dt_vencimento']));
-      $dias = $titulo['dias'];
-      $valorParcela = number_format($titulo['vl_parcela'], 2, ',', '.');
-      $valorSaldo = number_format($titulo['vl_saldo'], 2, ',', '.');
+      /** Formata os dados do banco para apresentar de uma forma melhor para o vendedor */
+      $lancamento = $titulo['CD_LANCAMENTO'];
+      $documento = $titulo['NR_DOCUMENTO'];
+      $parcela = $titulo['NR_PARCELA'];
+      $telefone = "(" . $titulo['NR_DDD'] . ") " . $titulo['NR_TELEFONE'];
+      $emailCliente = utf8_encode(strtolower($titulo['DS_EMAIL']));
+      $nomeCliente = utf8_encode(ucwords(strtolower($titulo['DS_CLIENTE'])));
+      $vencimento = date('d/m/Y', strtotime($titulo['DT_VENCIMENTO']));
+      $dias = $titulo['DIAS'];
+      $valorParcela = number_format($titulo['VL_PARCELA'], 2, ',', '.');
+      $valorSaldo = number_format($titulo['VL_SALDO'], 2, ',', '.');
       $tabela .=
         '<tr>
           <td>' . $lancamento . '</td>
